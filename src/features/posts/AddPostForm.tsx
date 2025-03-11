@@ -1,7 +1,7 @@
 import { useAppDispatch, useAppSelector } from "@/app/hooks"
-import React from "react"
-import { postAdded } from "./postsSlice"
+import React, { useState } from "react"
 import { selectCurrentUsername } from "../auth/authSlice"
+import { addNewPost } from "./postsSlice"
 
 // TS types for the input fields
 interface AddPostFormFields extends HTMLFormControlsCollection {
@@ -15,11 +15,12 @@ interface AddPostFormElements extends HTMLFormElement {
 
 export const AddPostForm = () => {
 
+    const [addRequestStatus, setAddRequestStatus] = useState<'idle' | 'pending'>('idle')
     // Get the `dispatch` method from the store
     const dispatch = useAppDispatch()
     const userId = useAppSelector(selectCurrentUsername) || ''
 
-    const handleSubmit = (e: React.FormEvent<AddPostFormElements>) => {
+    const handleSubmit = async (e: React.FormEvent<AddPostFormElements>) => {
         //Prevent server submission
         e.preventDefault()
 
@@ -28,12 +29,21 @@ export const AddPostForm = () => {
         const content = elements.postContent.value
 
 
-        dispatch(postAdded(title, content, userId))
-        // console.log('Values:', { title, content })
-        e.currentTarget.reset()
+        const form = e.currentTarget
+
+        try {
+            setAddRequestStatus('pending')
+            await dispatch(addNewPost({ title, content, user: userId })).unwrap()
+
+            form.reset()
+        } catch (err) {
+            console.error('Failed to save the post: ', err)
+        } finally {
+            setAddRequestStatus('idle')
+        }
     }
 
-   
+
 
     return (
         <section>
