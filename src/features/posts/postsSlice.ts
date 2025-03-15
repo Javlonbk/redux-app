@@ -1,8 +1,8 @@
 import { RootState } from "@/app/store"
 import { createAsyncThunk, createSlice, nanoid, PayloadAction } from "@reduxjs/toolkit"
-import { userLoggedOut } from '@/features/auth/authSlice'
 import { client } from "@/api/client"
 import { createAppAsyncThunk } from "@/app/withTypes"
+import { logout } from "../auth/authSlice"
 
 
 // Define a TS type for the data we'll be using
@@ -103,7 +103,7 @@ const postSlice = createSlice({
     extraReducers: (builder) => {
         // Pass the action creator to `builder.addCase()`
         builder
-        .addCase(userLoggedOut, (state) => {
+        .addCase(logout.fulfilled, (state) => {
             // Clear out the list of posts whenever the user logs out
             return initialState
         })
@@ -134,6 +134,11 @@ export default postSlice.reducer
 export const selectAllPosts = (state: RootState) => state.posts.posts
 
 export const selectedById = (state: RootState, postId: string) => state.posts.posts.find(post => post.id === postId)
+
+export const selectPostsByUser = (state: RootState, userId: string) => {
+    const allPosts = selectAllPosts(state)
+    return allPosts.filter(post => post.user === userId)
+}
 
 export const selectPostsStatus = (state: RootState) => state.posts.status
 export const selectPostsError = (state: RootState) => state.posts.error

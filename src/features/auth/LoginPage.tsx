@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectAllUsers } from '@/features/users/usersSlice'
+import { login } from './authSlice'
 
-import { userLoggedIn } from './authSlice'
 
 interface LoginPageFormFields extends HTMLFormControlsCollection {
   username: HTMLSelectElement
@@ -22,7 +22,7 @@ export const LoginPage = () => {
     e.preventDefault()
 
     const username = e.currentTarget.elements.username.value
-    dispatch(userLoggedIn(username))
+    dispatch(login(username))
     navigate('/posts')
   }
 
