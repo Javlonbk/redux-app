@@ -1,16 +1,16 @@
 import { useAppSelector } from "@/app/hooks"
 import { Link, useParams } from "react-router-dom"
-import { selectedById } from "./postsSlice"
 import { TimeAgo } from "@/components/TimeAgo"
 import { PostAuthor } from "./PostAuthor"
 import { ReactionButtons } from "./ReactionButtons"
 import { selectCurrentUsername } from "../auth/authSlice"
+import { selectPostById } from "./postsSlice"
 
 
 export const SinglePostPage = () => {
     const { postId } = useParams()
 
-    const post = useAppSelector(state => selectedById(state, postId!))
+    const post = useAppSelector(state => selectPostById(state, postId!))
     const currentUsername = useAppSelector(selectCurrentUsername)!
 
     if (!post) {

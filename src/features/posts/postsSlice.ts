@@ -1,8 +1,9 @@
 import { RootState } from "@/app/store"
-import { createAsyncThunk, createSlice, nanoid, PayloadAction } from "@reduxjs/toolkit"
+import { createAsyncThunk, createEntityAdapter, createSlice, EntityState, nanoid, PayloadAction } from "@reduxjs/toolkit"
 import { client } from "@/api/client"
 import { createAppAsyncThunk } from "@/app/withTypes"
 import { logout } from "../auth/authSlice"
+import { AppStartListening } from "@/app/listenerMiddleware"
 
 
 // Define a TS type for the data we'll be using
@@ -33,17 +34,21 @@ const initialReactions: Reactions = {
     eyes: 0
 }
 
-interface PostsState{
+interface PostsState extends EntityState<Post, string>{
     posts: Post[],
     status: 'idle' | 'pending' | 'succeed' | 'failed'
     error: string | null
 }
 
-const initialState: PostsState = {
+const postsAdapter = createEntityAdapter<Post>({
+    sortComparer: (a,b) => b.date.localeCompare(a.date)
+})
+
+const initialState: PostsState =  postsAdapter.getInitialState({
     posts: [],
     status: 'idle',
     error: null
-}
+})
 
 type PostUpdate = Pick<Post, 'id' | 'title' | 'content'>
 type NewPost = Pick<Post, 'title' | 'content' | 'user' >
@@ -82,11 +87,7 @@ const postSlice = createSlice({
     
         postUpdated(state, action: PayloadAction<PostUpdate>) {
             const { id, title, content } = action.payload
-            const existingPost = state.posts.find(post => post.id === id)
-            if (existingPost) {
-                existingPost.title = title
-                existingPost.content = content
-            }
+            postsAdapter.updateOne(state, { id, changes: { title, content } })
         },
 
         reactionAdded(
@@ -94,7 +95,7 @@ const postSlice = createSlice({
             action: PayloadAction<{ postId: string, reaction: ReactionName }>
         ) {
             const { postId, reaction } = action.payload
-            const existingPost = state.posts.find(post => post.id === postId)
+            const existingPost = state.entities[postId]
             if (existingPost) {
                 existingPost.reactions[reaction]++
             }
@@ -112,16 +113,13 @@ const postSlice = createSlice({
         })
         .addCase(fetchPosts.fulfilled, (state, action) => {
             state.status = 'succeed'
-            state.posts.push(...action.payload)
+            postsAdapter.setAll(state, action.payload)
         })
         .addCase(fetchPosts.rejected, (state, action) => {
             state.status = 'failed'
             state.error = action.error.message ?? 'Unknown Error'
         })
-        .addCase(addNewPost.fulfilled, (state, action) => {
-            state.posts.push(action.payload)
-        })
-    
+        .addCase(addNewPost.fulfilled, postsAdapter.addOne)
     }
 })
 
@@ -131,9 +129,14 @@ export const { postUpdated, reactionAdded } = postSlice.actions
 // Export the generated reducer function
 export default postSlice.reducer
 
-export const selectAllPosts = (state: RootState) => state.posts.posts
-
-export const selectedById = (state: RootState, postId: string) => state.posts.posts.find(post => post.id === postId)
+// Export the customized selectors for this adapter using `getSelectors`
+export const {
+    selectAll: selectAllPosts,
+    selectById: selectPostById,
+    selectIds: selectPostIds
+    // Pass in a selector that returns the posts slice of state
+  } = postsAdapter.getSelectors((state: RootState) => state.posts)
+  
 
 export const selectPostsByUser = (state: RootState, userId: string) => {
     const allPosts = selectAllPosts(state)
@@ -142,3 +145,21 @@ export const selectPostsByUser = (state: RootState, userId: string) => {
 
 export const selectPostsStatus = (state: RootState) => state.posts.status
 export const selectPostsError = (state: RootState) => state.posts.error
+
+export const addPostsListeners = (startAppListening: AppStartListening) => {
+    startAppListening({
+        actionCreator: addNewPost.fulfilled,
+        effect: async (action, listenerApi) => {
+          const { toast } = await import('react-tiny-toast')
+    
+          const toastId = toast.show('New post added!', {
+            variant: 'success',
+            position: 'bottom-right',
+            pause: true
+          })
+    
+          await listenerApi.delay(5000)
+          toast.remove(toastId)
+        }
+    })
+}
