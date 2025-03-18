@@ -1,29 +1,21 @@
-import React, { useEffect } from 'react'
+import React, { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-
-import { useAppSelector, useAppDispatch } from '@/app/hooks'
 
 import { Spinner } from '@/components/Spinner'
 import { TimeAgo } from '@/components/TimeAgo'
 
+import { useGetPostsQuery, Post } from '@/features/api/apiSlice'
+
 import { PostAuthor } from './PostAuthor'
 import { ReactionButtons } from './ReactionButtons'
-import {
-  fetchPosts,
-  selectPostById,
-  selectPostIds,
-  selectPostsStatus,
-  selectPostsError,
-  selectAllPosts
-} from './postsSlice'
-import { useSelector } from 'react-redux'
+import classNames from 'classnames'
 
+// Go back to passing a `post` object as a prop
 interface PostExcerptProps {
-  postId: string
+  post: Post
 }
 
-function PostExcerpt({ postId }: PostExcerptProps) {
-  const post = useAppSelector(state => selectPostById(state, postId))
+function PostExcerpt({ post }: PostExcerptProps) {
   return (
     <article className="post-excerpt" key={post.id}>
       <h3>
@@ -40,33 +32,51 @@ function PostExcerpt({ postId }: PostExcerptProps) {
 }
 
 export const PostsList = () => {
-  const dispatch = useAppDispatch()
-  const orderedPostIds = useSelector(selectPostIds)
-  const posts = useAppSelector(selectAllPosts)
-  const postStatus = useAppSelector(selectPostsStatus)
-  const postsError = useAppSelector(selectPostsError)
-
-  useEffect(() => {
-    if (postStatus === 'idle') {
-      dispatch(fetchPosts())
-    }
-  }, [postStatus, dispatch])
+  // Calling the `useGetPostsQuery()` hook automatically fetches data!
+  const {
+    data: posts = [],
+    isLoading,
+    isFetching,
+    isSuccess,
+    isError,
+    error,
+    refetch
+  } = useGetPostsQuery()
 
   let content: React.ReactNode
 
-  if (postStatus === 'pending') {
+  const sortedPosts = useMemo(() => {
+    const sortedPosts = posts.slice()
+    // Sort posts in descending chronological order
+    sortedPosts.sort((a,b) => b.date.localeCompare(a.date))
+    return sortedPosts
+  }, [posts])
+
+  // Show loading states based on the hook status flags
+  if (isLoading) {
     content = <Spinner text="Loading..." />
-  } else if (postStatus === 'succeed') {
-    content = orderedPostIds.map(postId => (
-      <PostExcerpt key={postId} postId={postId} />
-    ))
-  } else if (postStatus === 'failed') {
-    content = <div>{postsError}</div>
+  } else if (isSuccess) {
+    const renderedPosts = sortedPosts.map(post => (
+      <PostExcerpt key={post.id} post={post} />
+    )) 
+
+    const containerClassname = classNames('posts-container', {
+      disabled: isFetching
+    })
+
+    content = <div className={containerClassname}>{renderedPosts}</div>
   }
+    
+    else if (isError) {
+    content = <div>{error.toString()}</div>
+  }
+
+  
 
   return (
     <section className="posts-list">
       <h2>Posts</h2>
+      <button onClick={refetch}>Refetch Posts</button>
       {content}
     </section>
   )

@@ -1,8 +1,20 @@
-import { useAppSelector } from "@/app/hooks"
 import { Link, useParams } from "react-router-dom"
-import { selectUserById } from "./usersSlice"
-import { selectPostsByUser } from "../posts/postsSlice"
+import { createSelector } from "@reduxjs/toolkit"
+import { TypedUseQueryStateResult } from "@reduxjs/toolkit/query/react"
 
+import { useAppSelector } from "@/app/hooks"
+
+import { Post, useGetPostsQuery } from "../api/apiSlice"
+
+import { selectUserById } from "./usersSlice"
+
+type GetPostSelectFromResultArg = TypedUseQueryStateResult<Post[], any, any>
+
+const selectPostsForUser = createSelector(
+    (res: GetPostSelectFromResultArg) => res.data,
+    (res: GetPostSelectFromResultArg, userId: string) => userId,
+    (data, userId) => data?.filter(post => post.user === userId)
+  )
 
 
 export const UserPage = () => {
@@ -10,7 +22,16 @@ export const UserPage = () => {
 
     const user = useAppSelector(state => selectUserById(state, userId!))
 
-    const postsForUser = useAppSelector(state => selectPostsByUser(state, userId!))
+    const { postsForUser } = useGetPostsQuery(undefined, {
+        selectFromResult: result => ({
+          // Optional: Include all of the existing result fields like `isFetching`
+          ...result,
+          // Include a field called `postsForUser` in the result object,
+          // which will be a filtered list of posts
+          postsForUser: selectPostsForUser(result, userId!)
+        })
+      })
+    
 
     if(!user){
         return(
@@ -18,7 +39,7 @@ export const UserPage = () => {
         )
     }
 
-    const postTitles = postsForUser.map(post => (
+    const postTitles = postsForUser?.map(post => (
         <li key={post.id}>
           <Link to={`/posts/${post.id}`}>{post.title}</Link>
         </li>
